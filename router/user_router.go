@@ -9,12 +9,16 @@ import (
 
 // Register user routes
 func SetupUserRoutes(r *gin.Engine) {
-    r.POST("/register", controllers.Register)
-    r.POST("/login", controllers.Login)
-    r.POST("/logout", controllers.Logout)
+    r.Static("/uploads", "./uploads")
 
-    auth := r.Group("/")
-    auth.Use(middleware.Auth())
-    auth.GET("/profile", controllers.Me)
-    auth.POST("/updateProfile", controllers.UpdateProfile)
+    api := r.Group("/api")
+    api.POST("/register", controllers.Register)
+    api.POST("/login", controllers.Login)
+    api.POST("/logout", controllers.Logout)
+
+    user := r.Group("/user")
+    user.Use(middleware.Auth())
+    user.GET("/profile", controllers.Me)
+    user.POST("/updateProfile", controllers.UpdateProfile)
+    user.POST("/uploadAvatar", controllers.UploadAvatar)
 }

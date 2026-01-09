@@ -12,11 +12,7 @@ import (
 )
 
 func Register(c *gin.Context) {
-    var req struct {
-        Username string `json:"username" binding:"required"`
-        Phone    string `json:"phone" binding:"required"`
-        Password string `json:"password" binding:"required,min=6"`
-    }
+    var req model.RegisterReq
 
     if err := c.ShouldBindJSON(&req); err != nil {
         c.JSON(400, gin.H{"msg": err.Error()})
@@ -41,14 +37,12 @@ func Register(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
-    var req struct {
-        Username string `json:"username" binding:"required"`
-        Password string `json:"password"`
-    }
+    var res model.LoginRes
+    var user model.User
+    var req model.LoginReq
 
     c.ShouldBindJSON(&req)
-
-    var user model.User
+    
     if err := config.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
         c.JSON(401, gin.H{"msg": "invalid credentials"})
         return
@@ -61,6 +55,11 @@ func Login(c *gin.Context) {
 
     token, _ := utils.GenerateToken(user.ID)
 
+    res.UserID = user.ID
+    res.Username = user.Username
+    res.Phone = user.Phone
+    res.Avatar = user.Avatar
+
     config.RedisClient.Set(
         config.Ctx,
         "login:"+fmt.Sprint(user.ID),
@@ -68,7 +67,10 @@ func Login(c *gin.Context) {
         24*time.Hour,
     )
 
-    c.JSON(200, gin.H{"token": token})
+    c.JSON(200, gin.H{
+        "token": token,
+        "user": res,
+    })
 }
 
 func Logout(c *gin.Context) {

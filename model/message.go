@@ -1,12 +1,19 @@
 package model
 
-import "time"
+import (
+	"time"
+	// "gorm.io/gorm"
+)
 
-// Message represents a chat message in Tiny IM
 type Message struct {
-	SenderID   int64     `json:"sender_id"`   // Who sends
-	ReceiverID int64     `json:"receiver_id"` // Who receives
-	Content    string    `json:"content"`     // Message body
-	Type       string    `json:"type"`        // text / file / typing_start / typing_end / open 
-	Timestamp  time.Time `json:"timestamp"`   // Sending time
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	SenderID   int64     `json:"sender_id"`
+	ReceiverID int64     `json:"receiver_id"` // for one-on-one chat
+	Content    string    `json:"content"`
+	Timestamp  time.Time `json:"timestamp"`
+	Type       string    `json:"type"` // text / file / typing_start / typing_end / open
+}
+
+type HistoryReq struct {
+	PeerID int64 `json:"peerID"`
 }

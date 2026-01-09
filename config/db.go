@@ -20,7 +20,7 @@ func InitDB() {
     DB = db
 
     // Auto migrate tables
-    err = DB.AutoMigrate(&model.User{})
+    err = DB.AutoMigrate(&model.User{}, &model.Contact{}, &model.Message{})
     if err != nil {
         log.Fatal("Failed to migrate user table:", err)
     }
