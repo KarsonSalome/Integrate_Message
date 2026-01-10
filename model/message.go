@@ -12,6 +12,7 @@ type Message struct {
 	Content    string    `json:"content"`
 	Timestamp  time.Time `json:"timestamp"`
 	Type       string    `json:"type"` // text / file / typing_start / typing_end / open
+	Readable   string    `json:"readable"`
 }
 
 type HistoryReq struct {

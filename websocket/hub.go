@@ -4,6 +4,7 @@ import (
 	"aurora-im/dao"
 	"aurora-im/model"
 	"sync"
+	"fmt"
 )
 
 type Hub struct {
@@ -52,5 +53,17 @@ func SendMessage(msg model.Message) {
 		receiver.Send <- msg
 	} else {
 		_ = dao.PushOfflineMessage(msg)
+	}	
+	
+	if msg.Type == "message" {
+		dao.UpdateContactMsg(msg)
+		if err := dao.SaveMessageToDB(msg); err != nil {
+			fmt.Printf("Error saving message:", err)
+		}
+	} else if msg.Type == "read" {
+		dao.UpdateReadHistory(msg)
+	} else if msg.Type == "typing" {
+		dao.UpdateTypingHistory(msg)
 	}
+	
 }

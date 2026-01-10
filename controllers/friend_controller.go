@@ -28,6 +28,7 @@ func AddContact(c *gin.Context) {
 		OwnerID:   uint(ownerID),
 		ContactID: req.ContactID,
 		LastMsg:   "",
+		State: "not_typing",
 	}
 
 	if err := config.DB.Create(&contact).Error; err != nil {
@@ -48,18 +49,34 @@ func GetContacts(c *gin.Context) {
 	}
 
 	var contacts []model.Contact
-	config.DB.Preload("Contact").
-		Where("owner_id = ?", uint(ownerID)).
+	config.DB.
+		Preload("Contact").
+		Preload("Owner").
+		Where("owner_id = ? OR contact_id = ?", uint(ownerID), uint(ownerID)).
 		Find(&contacts)
 
 	var res []gin.H
 	for _, c := range contacts {
-		res = append(res, gin.H{
-			"id":       c.Contact.ID,
-			"username": c.Contact.Username,
-			"avatar":   c.Contact.Avatar,
-			"lastmsg":  c.LastMsg,
-		})
+		if uint(ownerID) == c.OwnerID {
+			res = append(res, gin.H{
+				"contact_id": c.ContactID,
+				"username":   c.Contact.Username,
+				"avatar":     c.Contact.Avatar,
+				"last_msg":   c.LastMsg,
+				"state":	  c.State,
+				"last_sender":c.LastSenderID, 
+			})
+		} else if uint(ownerID) == c.ContactID {
+			res = append(res, gin.H{
+				"contact_id": c.OwnerID,
+				"username":   c.Owner.Username,
+				"avatar":     c.Owner.Avatar,
+				"lastmsg":    c.LastMsg,
+				"state":	  c.State,
+				"last_sender":c.LastSenderID,
+			})
+		}
+		
 	}
 
 	c.JSON(200, res)

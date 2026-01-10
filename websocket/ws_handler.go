@@ -3,7 +3,6 @@ package websocket
 import (
 	"aurora-im/config"
 	"aurora-im/model"
-	"aurora-im/dao"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -57,7 +56,7 @@ func WSHandler(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("New User Connected %d\n", uid)
+	fmt.Printf("New User Connected: %d\n", uid)
 
 	client := NewClient(uid, conn)
 	RegisterClient(client)
@@ -79,18 +78,16 @@ func WSHandler(c *gin.Context) {
 			conn.Close()
 			break
 		} else {
-			fmt.Printf("New Message Arrived:%s\n", msg)
+			fmt.Printf("New Message Arrived:%s\n", msg.Content)
 		}
 
 		// Add timestamp
 		msg.Timestamp = time.Now() // here!!!
 		msg.SenderID = uid
+		// msg.Type = "message"
+		msg.Readable = "unread"
 
 		// Deliver message
 		SendMessage(msg)
-
-		if err := dao.SaveMessageToDB(msg); err != nil {
-			fmt.Printf("Error saving message to DB: %s\n", err)
-		}
 	}
 }
