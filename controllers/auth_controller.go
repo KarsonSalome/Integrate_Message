@@ -25,7 +25,7 @@ func Register(c *gin.Context) {
         Username: req.Username,
         Phone:    req.Phone,
         Password: hash,
-        Avatar: "uploads/avatars/default.png",
+        Avatar: "/uploads/avatar/default.png",
     }
 
     if err := config.DB.Create(&user).Error; err != nil {

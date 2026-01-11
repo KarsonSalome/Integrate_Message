@@ -7,6 +7,8 @@ import (
 	"aurora-im/model"
 
 	"strconv"
+	"errors"
+	"gorm.io/gorm"
 )
 
 func AddContact(c *gin.Context) {
@@ -29,6 +31,19 @@ func AddContact(c *gin.Context) {
 		ContactID: req.ContactID,
 		LastMsg:   "",
 		State: "not_typing",
+	}
+
+	var oldContact model.Contact
+
+	dberro := config.DB.Where("(owner_id = ? AND contact_id = ?) OR (contact_id = ? AND owner_id = ?)", req.ContactID, uint(ownerID), req.ContactID, uint(ownerID)).First(&oldContact).Error
+	if dberro == nil || req.ContactID == uint(ownerID) {
+    	c.JSON(400, gin.H{"error": "contact already exists"})
+    	return
+	}
+
+	if !errors.Is(dberro, gorm.ErrRecordNotFound) {
+    	c.JSON(500, gin.H{"error": err.Error()})
+    	return
 	}
 
 	if err := config.DB.Create(&contact).Error; err != nil {
@@ -90,7 +105,7 @@ func SearchUser(c *gin.Context) {
 	c.ShouldBindJSON(&req)
 
 	if err := config.DB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
-		c.JSON(401, gin.H{"msg": "invalid credentials"})
+		c.JSON(404, gin.H{"msg": "invalid credentials"})
 		return
 	}
 
@@ -99,7 +114,5 @@ func SearchUser(c *gin.Context) {
 	res.Phone = user.Phone
 	res.Avatar = user.Avatar
 
-	c.JSON(200, gin.H{
-		"Search": res,
-	})
+	c.JSON(200, res)
 }
