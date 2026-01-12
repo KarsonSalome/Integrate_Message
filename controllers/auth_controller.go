@@ -5,8 +5,8 @@ import (
 	"aurora-im/model"
 	"aurora-im/config"
 
-	"time"
-	"fmt"
+	//"time"
+	//"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -60,12 +60,12 @@ func Login(c *gin.Context) {
     res.Phone = user.Phone
     res.Avatar = user.Avatar
 
-    config.RedisClient.Set(
-        config.Ctx,
-        "login:"+fmt.Sprint(user.ID),
-        token,
-        24*time.Hour,
-    )
+    // config.RedisClient.Set(
+    //     config.Ctx,
+    //     "login:"+fmt.Sprint(user.ID),
+    //     token,
+    //     24*time.Hour,
+    // )
 
     c.JSON(200, gin.H{
         "token": token,

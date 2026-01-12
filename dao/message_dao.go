@@ -3,35 +3,42 @@ package dao
 import (
 	"aurora-im/config"
 	"aurora-im/model"
-	"encoding/json"
+	//"encoding/json"
 )
 
 // Redis key: "offline:<receiver_id>"
 
 // Store message to Redis
 func PushOfflineMessage(msg model.Message) error {
-	key := "offline:" + string(rune(msg.ReceiverID))
-	data, _ := json.Marshal(msg)
-	return config.RedisClient.RPush(config.Ctx, key, data).Err()
+	// key := "offline:" + string(rune(msg.ReceiverID))
+	// data, _ := json.Marshal(msg)
+	// return config.RedisClient.RPush(config.Ctx, key, data).Err()
+	return nil
 }
 
 // Get all offline messages
 func GetOfflineMessages(receiverID int64) ([]model.Message, error) {
-	key := "offline:" + string(rune(receiverID))
-	list, err := config.RedisClient.LRange(config.Ctx, key, 0, -1).Result()
-	if err != nil {
-		return nil, err
-	}
+	// key := "offline:" + string(rune(receiverID))
+	// list, err := config.RedisClient.LRange(config.Ctx, key, 0, -1).Result()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-	var msgs []model.Message
-	for _, item := range list {
-		var msg model.Message
-		json.Unmarshal([]byte(item), &msg)
-		msgs = append(msgs, msg)
-	}
+	// var msgs []model.Message
+	// for _, item := range list {
+	// 	var msg model.Message
+	// 	json.Unmarshal([]byte(item), &msg)
+	// 	msgs = append(msgs, msg)
+	// }
 
-	// Delete after fetching
-	config.RedisClient.Del(config.Ctx, key)
+	// // Delete after fetching
+	// config.RedisClient.Del(config.Ctx, key)
 
-	return msgs, nil
+	// return msgs, nil
+	var messages []model.Message
+	err := config.DB.
+		Where("receiver_id = ?", receiverID).
+		Order("timestamp ASC").
+		Find(&messages).Error
+	return messages, err
 }

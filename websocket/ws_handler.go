@@ -1,93 +1,78 @@
 package websocket
 
 import (
-	"aurora-im/config"
-	"aurora-im/model"
-
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/websocket"
-
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/olahol/melody"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
+var hub = NewHub()
+var m = melody.New()
+
+var jwtSecret = []byte("dev-secret")
 
 func parseToken(tokenStr string) (int64, error) {
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte("dev-secret"), nil
+		return jwtSecret, nil
 	})
-
 	if err != nil || !token.Valid {
 		return 0, fmt.Errorf("invalid token")
 	}
-
 	claims := token.Claims.(jwt.MapClaims)
-	uid := int64(claims["uid"].(float64))
-	return uid, nil
+	return int64(claims["uid"].(float64)), nil
 }
 
-// WSHandler handles WebSocket connections
-func WSHandler(c *gin.Context) {
-	tokenStr := c.Query("token")
-	if tokenStr == "" {
-		c.JSON(401, gin.H{"msg": "missing token"})
-		return
-	}
+type WSMessage struct {
+	ReceiverID int64  `json:"receiver_id"`
+	Content    string `json:"content"`
+	Type       string `json:"type"`
+}
 
-	uid, err := parseToken(tokenStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "invalid token"})
-		return
-	}
-
-	redisToken, err := config.RedisClient.Get(config.Ctx, "login:"+fmt.Sprint(uid)).Result()
-	if err != nil || redisToken != tokenStr {
-		c.JSON(401, gin.H{"msg": "token expired"})
-		return
-	}
-
-	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		return
-	}
-
-	fmt.Printf("New User Connected: %d\n", uid)
-
-	client := NewClient(uid, conn)
-	RegisterClient(client)
-
-	// Write loop: send messages from channel to client
-	go func() {
-		for msg := range client.Send {
-			client.Write(msg)
+func WSHandler() http.HandlerFunc {
+	// Initialize handlers once
+	m.HandleConnect(func(s *melody.Session) {
+		tokenStr := s.Request.URL.Query().Get("token")
+		if tokenStr == "" {
+			s.Close()
+			return
 		}
-	}()
-
-	// Read loop: receive messages from client
-	for {
-		var msg model.Message
-		err := conn.ReadJSON(&msg)
+		uid, err := parseToken(tokenStr)
 		if err != nil {
-			fmt.Printf("Error occured while reading msg %s\n", err)
-			UnregisterClient(uid)
-			conn.Close()
-			break
-		} else {
-			fmt.Printf("New Message Arrived:%s\n", msg.Content)
+			s.Close()
+			return
 		}
+		hub.Register(uid, s)
+		s.Set("uid", uid)
+	})
 
-		// Add timestamp
-		msg.Timestamp = time.Now() // here!!!
-		msg.SenderID = uid
-		// msg.Type = "message"
-		msg.Readable = "unread"
+	m.HandleDisconnect(func(s *melody.Session) {
+		if uidAny, ok := s.Get("uid"); ok {
+			uid := uidAny.(int64)
+			hub.Unregister(uid, s)
+		}
+	})
 
-		// Deliver message
-		SendMessage(msg)
+	m.HandleMessage(func(s *melody.Session, msg []byte) {
+		if uidAny, ok := s.Get("uid"); ok {
+			uid := uidAny.(int64)
+			var incoming WSMessage
+			if err := json.Unmarshal(msg, &incoming); err != nil {
+				fmt.Println("Invalid message format:", err)
+				return
+			}
+			b := Broadcast{
+				From:    uid,
+				Content: incoming.Content,
+				Type:    incoming.Type,
+			}
+			hub.SendMessage(incoming.ReceiverID, b)
+		}
+	})
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		m.HandleRequest(w, r)
 	}
 }

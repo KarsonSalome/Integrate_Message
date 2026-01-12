@@ -1,69 +1,64 @@
 package websocket
 
 import (
-	"aurora-im/dao"
-	"aurora-im/model"
-	"sync"
+	"encoding/json"
 	"fmt"
+	"sync"
+
+	"github.com/olahol/melody"
 )
 
+
+type Broadcast struct {
+	From    int64  `json:"from"`
+	Content string `json:"content"`
+	Type    string `json:"type"`
+}
+
 type Hub struct {
-	Clients map[int64]*Client
-	Lock    sync.RWMutex
+	UserSessions map[int64]map[*melody.Session]bool
+	Lock         sync.RWMutex
 }
 
-var hub *Hub
-
-// Initialize hub
-func InitHub() {
-	hub = &Hub{
-		Clients: make(map[int64]*Client),
+func NewHub() *Hub {
+	return &Hub{
+		UserSessions: make(map[int64]map[*melody.Session]bool),
 	}
 }
 
-// RegisterClient adds a client and sends offline messages
-func RegisterClient(client *Client) {
-	hub.Lock.Lock()
-	defer hub.Lock.Unlock()
-	hub.Clients[client.UID] = client
+func (h *Hub) Register(uid int64, s *melody.Session) {
+	h.Lock.Lock()
+	
+	if _, ok := h.UserSessions[uid]; !ok {
+		h.UserSessions[uid] = make(map[*melody.Session]bool)
+	}
+	h.UserSessions[uid][s] = true
+	fmt.Println("Client registered:", uid)
 
-	// Fetch offline messages asynchronously
-	go func() {
-		msgs, _ := dao.GetOfflineMessages(client.UID)
-		for _, msg := range msgs {
-			client.Send <- msg
+	h.Lock.Unlock()
+}
+
+func (h *Hub) Unregister(uid int64, s *melody.Session) {
+	h.Lock.Lock()
+	defer h.Lock.Unlock()
+	if sessions, ok := h.UserSessions[uid]; ok {
+		delete(sessions, s)
+		if len(sessions) == 0 {
+			delete(h.UserSessions, uid)
+			fmt.Println("Client unregistered:", uid)
 		}
-	}()
+	}
 }
 
-// UnregisterClient removes client (EXPORT with uppercase!)
-func UnregisterClient(uid int64) {
-	hub.Lock.Lock()
-	defer hub.Lock.Unlock()
-	delete(hub.Clients, uid)
-}
-
-// SendMessage delivers message or stores in Redis if offline
-func SendMessage(msg model.Message) {
-	hub.Lock.RLock()
-	receiver, online := hub.Clients[msg.ReceiverID]
-	hub.Lock.RUnlock()
-
-	if online {
-		receiver.Send <- msg
+func (h *Hub) SendMessage(toUID int64, msg Broadcast) {
+	h.Lock.RLock()
+	defer h.Lock.RUnlock()
+	if sessions, ok := h.UserSessions[toUID]; ok {
+		data, _ := json.Marshal(msg)
+		for s := range sessions {
+			s.Write(data)
+		}
 	} else {
-		_ = dao.PushOfflineMessage(msg)
-	}	
-	
-	if msg.Type == "message" {
-		dao.UpdateContactMsg(msg)
-		if err := dao.SaveMessageToDB(msg); err != nil {
-			fmt.Printf("Error saving message:", err)
-		}
-	} else if msg.Type == "read" {
-		dao.UpdateReadHistory(msg)
-	} else if msg.Type == "typing" {
-		dao.UpdateTypingHistory(msg)
+		fmt.Println("User offline:", toUID)
 	}
-	
 }

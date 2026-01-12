@@ -18,8 +18,10 @@ func SetupRouter() *gin.Engine {
     // Friend APIs
     SetupFriendsRouter(r)
 
+    SetupChatRoutes(r)
+
     // WebSocket routes (already exist)
-    SetupWebSocketRoutes(r)
+    //SetupWebSocketRoutes(r)
 
     return r
 }

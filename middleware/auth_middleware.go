@@ -1,7 +1,7 @@
 package middleware
 
 import (
-    "aurora-im/config"
+    //"aurora-im/config"
     "github.com/gin-gonic/gin"
     "github.com/golang-jwt/jwt/v5"
 
@@ -24,11 +24,11 @@ func Auth() gin.HandlerFunc {
         claims := token.Claims.(jwt.MapClaims)
         uid := fmt.Sprint(claims["uid"])
 
-        val, _ := config.RedisClient.Get(config.Ctx, "login:"+uid).Result()
-        if val != tokenStr {
-            c.AbortWithStatusJSON(401, gin.H{"msg": "expired"})
-            return
-        }
+        // val, _ := config.RedisClient.Get(config.Ctx, "login:"+uid).Result()
+        // if val != tokenStr {
+        //     c.AbortWithStatusJSON(401, gin.H{"msg": "expired"})
+        //     return
+        // }
 
         c.Set("uid", uid)
         c.Next()
