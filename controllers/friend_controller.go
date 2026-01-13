@@ -31,6 +31,8 @@ func AddContact(c *gin.Context) {
 		ContactID: req.ContactID,
 		LastMsg:   "",
 		State: "not_typing",
+		LastSenderID: 0,
+		UnreadCount: 0,
 	}
 
 	var oldContact model.Contact
@@ -79,16 +81,18 @@ func GetContacts(c *gin.Context) {
 				"avatar":     c.Contact.Avatar,
 				"last_msg":   c.LastMsg,
 				"state":	  c.State,
-				"last_sender":c.LastSenderID, 
+				"last_sender":c.LastSenderID,
+				"last_time":   c.UpdatedAt, 
 			})
 		} else if uint(ownerID) == c.ContactID {
 			res = append(res, gin.H{
 				"contact_id": c.OwnerID,
 				"username":   c.Owner.Username,
 				"avatar":     c.Owner.Avatar,
-				"lastmsg":    c.LastMsg,
+				"last_msg":    c.LastMsg,
 				"state":	  c.State,
 				"last_sender":c.LastSenderID,
+				"last_time":   c.UpdatedAt,
 			})
 		}
 		

@@ -4,15 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-
+	"time"
 	"github.com/olahol/melody"
+	"aurora-im/model"
+	"aurora-im/dao"
 )
 
 
 type Broadcast struct {
-	From    int64  `json:"from"`
-	Content string `json:"content"`
-	Type    string `json:"type"`
+	From    	int64  		`json:"from"`
+	Content 	string 		`json:"content"`
+	Type    	string 		`json:"type"`
+	TimeAt	    time.Time 	`json:"time_at"`
 }
 
 type Hub struct {
@@ -27,15 +30,26 @@ func NewHub() *Hub {
 }
 
 func (h *Hub) Register(uid int64, s *melody.Session) {
-	h.Lock.Lock()
-	
+	h.Lock.Lock()	
 	if _, ok := h.UserSessions[uid]; !ok {
 		h.UserSessions[uid] = make(map[*melody.Session]bool)
 	}
 	h.UserSessions[uid][s] = true
 	fmt.Println("Client registered:", uid)
-
 	h.Lock.Unlock()
+
+	// Send offline messages
+	offlineMessages, err := dao.GetOfflineMessages(uid)
+	if err != nil {
+		fmt.Println("Error fetching offline messages:", err)
+		return
+	}
+	for _, msg := range offlineMessages {
+		data, _ := json.Marshal(msg)
+		s.Write(data)
+		fmt.Println("Sent offline message to", uid, ":", msg)
+	}
+	dao.UpdateDeliveredHistory(uid)
 }
 
 func (h *Hub) Unregister(uid int64, s *melody.Session) {
@@ -50,15 +64,33 @@ func (h *Hub) Unregister(uid int64, s *melody.Session) {
 	}
 }
 
-func (h *Hub) SendMessage(toUID int64, msg Broadcast) {
+func (h *Hub) SendMessage(toUID int64, msg model.Message) {
 	h.Lock.RLock()
 	defer h.Lock.RUnlock()
 	if sessions, ok := h.UserSessions[toUID]; ok {
+		msg.State = "delivered"
+		
+		switch msg.Type {
+		case "message":
+			dao.SaveMessageToDB(msg)
+			dao.UpdateContactMsg(msg)
+		case "read":
+			dao.UpdateReadHistory(msg)
+		}
+
 		data, _ := json.Marshal(msg)
 		for s := range sessions {
 			s.Write(data)
 		}
 	} else {
+		msg.State = "sent"
+		switch msg.Type {
+		case "message":
+			dao.SaveMessageToDB(msg)
+			dao.UpdateContactMsg(msg)
+		case "read":
+			dao.UpdateReadHistory(msg)
+		}
 		fmt.Println("User offline:", toUID)
 	}
 }

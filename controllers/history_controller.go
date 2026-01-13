@@ -27,9 +27,12 @@ func GetHistory(c *gin.Context) {
 	PeerID := req.PeerID
 
 	history, _ := dao.LoadHistory(UserID, PeerID)
-	for _, msg := range history {
-		c.JSON(200, gin.H{
-			"history": msg,
-		})
-	}
+	// for _, msg := range history {
+	// 	c.JSON(200, gin.H{
+	// 		"history": msg,
+	// 	})
+	// }
+	c.JSON(200, gin.H{
+		"history": history,
+	})
 }

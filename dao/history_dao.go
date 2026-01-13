@@ -25,11 +25,12 @@ func UpdateContactMsg(res model.Message) {
 	contact.LastMsg = res.Content
 	contact.State = "not_typing"
 	contact.LastSenderID = uint(res.SenderID)
+	contact.UnreadCount += 1
 
 	result := config.DB.
 		Model(&model.Contact{}).
 		Where("owner_id = ? AND contact_id = ?", contact.OwnerID, contact.ContactID).
-		Select("last_msg", "state", "last_sender_id").
+		Select("last_msg", "state", "last_sender_id", "unread_count").
 		Updates(contact)
 
 	if result.Error != nil {
@@ -45,45 +46,27 @@ func LoadHistory(uid, peerID int64) ([]model.Message, error) {
 	err := config.DB.
 		Where("(sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)", uid, peerID, peerID, uid).
 		Order("timestamp ASC").
-		Limit(100).
 		Find(&messages).Error
 	return messages, err
 }
 
 func UpdateReadHistory(msg model.Message) {
-	result := config.DB.
+	readRes := config.DB.
 		Model(&model.Message{}).
-		Where("sender_id = ? AND receiver_id = ? AND readable = ?", msg.ReceiverID, msg.SenderID, "unread").
-		Update("readable", "read")
+		Where("sender_id = ? AND receiver_id = ? AND state = ?", msg.ReceiverID, msg.SenderID, "delivered").
+		Update("state", "read")
 
-	if result.Error != nil {
-		fmt.Println("msg: contact update error")
+	if readRes.Error != nil {
+		fmt.Println("msg: Read State update error")
 		return
 	} else {
-		fmt.Println("msg: contact updated!")
+		fmt.Println("msg: Read State updated!")
 	}
-}
-
-func UpdateTypingHistory(res model.Message) {
-	var contact model.Contact
-
-	err := config.DB.
-		Where("(owner_id = ? AND contact_id = ?) OR (contact_id = ? AND owner_id = ?)", res.SenderID, res.ReceiverID, res.SenderID, res.ReceiverID).
-		Find(&contact).Error
-
-	if err != nil {
-		fmt.Println("contact find error")
-		return
-	}
-
-	contact.State = "typing"
-	contact.LastSenderID = uint(res.SenderID)
 
 	result := config.DB.
 		Model(&model.Contact{}).
-		Where("owner_id = ? AND contact_id = ?", contact.OwnerID, contact.ContactID).
-		Select("state", "last_sender_id").
-		Updates(contact)
+		Where("(owner_id = ? AND contact_id = ?) OR (owner_id = ? AND contact_id = ?)", msg.ReceiverID, msg.SenderID, msg.ReceiverID, msg.SenderID).
+		Update("unread_count", 0)
 
 	if result.Error != nil {
 		fmt.Println("msg: contact update error")
@@ -92,3 +75,46 @@ func UpdateTypingHistory(res model.Message) {
 		fmt.Println("msg: contact updated!")
 	}
 }
+
+func UpdateDeliveredHistory(receiverID int64) {
+	result := config.DB.
+		Model(&model.Message{}).
+		Where("receiver_id = ? AND state = ?", receiverID, "sent").
+		Update("state", "delivered")
+
+	if result.Error != nil {
+		fmt.Println("msg: Delivered update error")
+		return
+	} else {
+		fmt.Println("msg: Delivered updated!")
+	}
+}
+
+// func UpdateTypingHistory(res model.Message) {
+// 	var contact model.Contact
+
+// 	err := config.DB.
+// 		Where("(owner_id = ? AND contact_id = ?) OR (contact_id = ? AND owner_id = ?)", res.SenderID, res.ReceiverID, res.SenderID, res.ReceiverID).
+// 		Find(&contact).Error
+
+// 	if err != nil {
+// 		fmt.Println("contact find error")
+// 		return
+// 	}
+
+// 	contact.State = "typing"
+// 	contact.LastSenderID = uint(res.SenderID)
+
+// 	result := config.DB.
+// 		Model(&model.Contact{}).
+// 		Where("owner_id = ? AND contact_id = ?", contact.OwnerID, contact.ContactID).
+// 		Select("state", "last_sender_id").
+// 		Updates(contact)
+
+// 	if result.Error != nil {
+// 		fmt.Println("msg: contact update error")
+// 		return
+// 	} else {
+// 		fmt.Println("msg: contact updated!")
+// 	}
+// }

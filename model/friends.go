@@ -11,6 +11,7 @@ type Contact struct {
     LastMsg string `gorm:"type:varchar(100)" json:"last_msg"`
     State string  `gorm:"type:varchar(10)" json:"state"`
     LastSenderID uint `json:"last_sender_id"`
+    UnreadCount int `json:"unread_count"`
     
     Owner   User `gorm:"foreignKey:OwnerID;references:ID"`   // owner info
     Contact User `gorm:"foreignKey:ContactID;references:ID"` // contact info

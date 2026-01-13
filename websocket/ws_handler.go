@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
+	// "time"
+	"aurora-im/model"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/olahol/melody"
 )
@@ -26,9 +27,9 @@ func parseToken(tokenStr string) (int64, error) {
 }
 
 type WSMessage struct {
-	ReceiverID int64  `json:"receiver_id"`
-	Content    string `json:"content"`
-	Type       string `json:"type"`
+	ReceiverID int64  	 `json:"receiver_id"`
+	Content    string 	 `json:"content"`
+	Type       string 	 `json:"type"`
 }
 
 func WSHandler() http.HandlerFunc {
@@ -58,17 +59,15 @@ func WSHandler() http.HandlerFunc {
 	m.HandleMessage(func(s *melody.Session, msg []byte) {
 		if uidAny, ok := s.Get("uid"); ok {
 			uid := uidAny.(int64)
-			var incoming WSMessage
+			var incoming model.Message
 			if err := json.Unmarshal(msg, &incoming); err != nil {
 				fmt.Println("Invalid message format:", err)
 				return
 			}
-			b := Broadcast{
-				From:    uid,
-				Content: incoming.Content,
-				Type:    incoming.Type,
-			}
-			hub.SendMessage(incoming.ReceiverID, b)
+			incoming.SenderID = uid
+			// incoming.Timestamp = time.Now()
+			// Here you can save the message to DB if needed
+			hub.SendMessage(incoming.ReceiverID, incoming)
 		}
 	})
 
