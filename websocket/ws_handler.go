@@ -64,6 +64,7 @@ func WSHandler() http.HandlerFunc {
 		if uidAny, ok := s.Get("uid"); ok {
 			uid := uidAny.(int64)
 			var incoming model.Message
+			fmt.Println("Received message from", uid, ":", string(msg))
 			if err := json.Unmarshal(msg, &incoming); err != nil {
 				fmt.Println("Invalid message format:", err)
 				return
@@ -73,7 +74,7 @@ func WSHandler() http.HandlerFunc {
 				fmt.Println("ReceiverID is required")
 				return
 			}
-			
+
 			incoming.SenderID = uid
 			// incoming.Timestamp = time.Now()
 			// Here you can save the message to DB if needed

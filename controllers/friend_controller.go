@@ -145,4 +145,13 @@ func DeleteContact(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"msg": "contact deleted"})
+
+	delres := config.DB.
+		Where("(sender_id = ? AND receiver_id = ?) OR (receiver_id = ? AND sender_id = ?)", ownerID, int64(req.ContactID), ownerID, int64(req.ContactID)).
+		Delete(&model.Message{})
+	if delres.Error != nil {
+		c.JSON(500, gin.H{"error": delres.Error.Error()})
+		return
+	}
+
 }

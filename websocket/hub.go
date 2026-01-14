@@ -82,6 +82,7 @@ func (h *Hub) SendMessage(toUID int64, msg model.Message) {
 
 	h.Lock.RLock()
 	sessions, online := h.UserSessions[toUID]
+	returnSession, exists := h.UserSessions[msg.SenderID]
 	h.Lock.RUnlock()
 
 	/* ---------- READ EVENT ---------- */
@@ -124,5 +125,12 @@ func (h *Hub) SendMessage(toUID int64, msg model.Message) {
 		}
 	} else {
 		fmt.Println("User offline:", toUID)
+	}
+
+	if exists {
+		data, _ := json.Marshal(msg)
+		for s := range returnSession {
+			s.Write(data)
+		}
 	}
 }
