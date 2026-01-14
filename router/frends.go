@@ -12,4 +12,5 @@ func SetupFriendsRouter(r *gin.Engine) {
     friend.GET("/getFriends", controllers.GetContacts)
     friend.POST("/addFriend", controllers.AddContact)
 	friend.POST("/searchFriend", controllers.SearchUser)
+	friend.POST("/deleteFriend", controllers.DeleteContact)
 }

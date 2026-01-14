@@ -13,6 +13,10 @@ import (
 var hub = NewHub()
 var m = melody.New()
 
+func init() {
+	m.Config.MaxMessageSize = 1024 * 1024
+}
+
 var jwtSecret = []byte("dev-secret")
 
 func parseToken(tokenStr string) (int64, error) {
@@ -64,6 +68,12 @@ func WSHandler() http.HandlerFunc {
 				fmt.Println("Invalid message format:", err)
 				return
 			}
+
+			if incoming.ReceiverID == 0 {
+				fmt.Println("ReceiverID is required")
+				return
+			}
+			
 			incoming.SenderID = uid
 			// incoming.Timestamp = time.Now()
 			// Here you can save the message to DB if needed

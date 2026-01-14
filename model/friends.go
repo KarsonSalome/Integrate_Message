@@ -28,6 +28,6 @@ type SearchReq struct {
     Phone string `json:"phone"`
 }
 
-type AddContactReq struct {
+type ContactReq struct {
     ContactID uint `json:"contact_id"`
 }

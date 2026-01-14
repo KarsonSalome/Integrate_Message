@@ -4,19 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
+	// "time"
 	"github.com/olahol/melody"
 	"aurora-im/model"
 	"aurora-im/dao"
 )
 
-
-type Broadcast struct {
-	From    	int64  		`json:"from"`
-	Content 	string 		`json:"content"`
-	Type    	string 		`json:"type"`
-	TimeAt	    time.Time 	`json:"time_at"`
-}
+var (
+	selectMap  = make(map[int64]int64)
+	selectLock sync.RWMutex
+)
 
 type Hub struct {
 	UserSessions map[int64]map[*melody.Session]bool
@@ -46,7 +43,10 @@ func (h *Hub) Register(uid int64, s *melody.Session) {
 	}
 	for _, msg := range offlineMessages {
 		data, _ := json.Marshal(msg)
-		s.Write(data)
+		if err := s.Write(data); err != nil {
+			fmt.Println("Offline send failed:", err)
+			return
+		}
 		fmt.Println("Sent offline message to", uid, ":", msg)
 	}
 	dao.UpdateDeliveredHistory(uid)
@@ -59,38 +59,70 @@ func (h *Hub) Unregister(uid int64, s *melody.Session) {
 		delete(sessions, s)
 		if len(sessions) == 0 {
 			delete(h.UserSessions, uid)
+
+			selectLock.Lock()
+			delete(selectMap, uid)
+			selectLock.Unlock()
+
 			fmt.Println("Client unregistered:", uid)
 		}
 	}
 }
 
+func isReceiverViewingSender(msg model.Message) bool {
+	selectLock.RLock()
+	defer selectLock.RUnlock()
+
+	fmt.Println(selectMap)
+
+	return selectMap[msg.ReceiverID] == msg.SenderID
+}
+
 func (h *Hub) SendMessage(toUID int64, msg model.Message) {
+
 	h.Lock.RLock()
-	defer h.Lock.RUnlock()
-	if sessions, ok := h.UserSessions[toUID]; ok {
-		msg.State = "delivered"
-		
-		switch msg.Type {
-		case "message":
+	sessions, online := h.UserSessions[toUID]
+	h.Lock.RUnlock()
+
+	/* ---------- READ EVENT ---------- */
+	if msg.Type == "read" {
+		selectLock.Lock()
+		selectMap[msg.SenderID] = toUID
+		selectLock.Unlock()
+
+		dao.UpdateReadState(msg)
+		dao.UpdateUnreadCount(msg)
+		return
+	}
+
+	/* ---------- MESSAGE EVENT ---------- */
+	if msg.Type == "message" {
+		isActive := isReceiverViewingSender(msg)
+		fmt.Println("isActive:", isActive)
+		if online && isActive{
+			msg.State = "read"
+			dao.SaveMessageToDB(msg)
+			dao.UpdateContactReadMsg(msg)
+
+		} else if online {
+			msg.State = "delivered"
 			dao.SaveMessageToDB(msg)
 			dao.UpdateContactMsg(msg)
-		case "read":
-			dao.UpdateReadHistory(msg)
-		}
 
+		} else {
+			msg.State = "sent"
+			dao.SaveMessageToDB(msg)
+			dao.UpdateContactMsg(msg)
+		}		
+	}
+
+	/* ---------- PUSH TO CLIENT ---------- */
+	if online {
 		data, _ := json.Marshal(msg)
 		for s := range sessions {
 			s.Write(data)
 		}
 	} else {
-		msg.State = "sent"
-		switch msg.Type {
-		case "message":
-			dao.SaveMessageToDB(msg)
-			dao.UpdateContactMsg(msg)
-		case "read":
-			dao.UpdateReadHistory(msg)
-		}
 		fmt.Println("User offline:", toUID)
 	}
 }

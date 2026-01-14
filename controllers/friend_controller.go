@@ -12,7 +12,7 @@ import (
 )
 
 func AddContact(c *gin.Context) {
-	var req model.AddContactReq
+	var req model.ContactReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
@@ -78,21 +78,25 @@ func GetContacts(c *gin.Context) {
 			res = append(res, gin.H{
 				"contact_id": c.ContactID,
 				"username":   c.Contact.Username,
+				"phone":      c.Contact.Phone,
 				"avatar":     c.Contact.Avatar,
 				"last_msg":   c.LastMsg,
 				"state":	  c.State,
 				"last_sender":c.LastSenderID,
-				"last_time":   c.UpdatedAt, 
+				"last_time":   c.UpdatedAt,
+				"unread_count": c.UnreadCount,
 			})
 		} else if uint(ownerID) == c.ContactID {
 			res = append(res, gin.H{
 				"contact_id": c.OwnerID,
 				"username":   c.Owner.Username,
+				"phone":      c.Owner.Phone,
 				"avatar":     c.Owner.Avatar,
 				"last_msg":    c.LastMsg,
 				"state":	  c.State,
 				"last_sender":c.LastSenderID,
 				"last_time":   c.UpdatedAt,
+				"unread_count": c.UnreadCount,
 			})
 		}
 		
@@ -119,4 +123,26 @@ func SearchUser(c *gin.Context) {
 	res.Avatar = user.Avatar
 
 	c.JSON(200, res)
+}
+
+func DeleteContact(c *gin.Context) {
+	var req model.ContactReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetString("uid") // From JWT middleware
+	ownerID, err := strconv.ParseUint(userID, 10, 64)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "invalid uid"})
+		return
+	}
+	result := config.DB.
+		Where("(owner_id = ? AND contact_id = ?) OR (contact_id = ? AND owner_id = ?)", uint(ownerID), req.ContactID, uint(ownerID), req.ContactID).
+		Delete(&model.Contact{})
+	if result.Error != nil {
+		c.JSON(500, gin.H{"error": result.Error.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"msg": "contact deleted"})
 }
